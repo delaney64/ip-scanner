@@ -5,7 +5,7 @@ This script provides comprehensive threat intelligence gathering capabilities fo
 by integrating with multiple security services including VirusTotal, GrayNoise, Shodan, and
 MITRE ATT&CK framework. It includes secure API key handling and detailed error reporting.
 
-Author: Claude
+Author: Delaney
 Date: February 2025
 """
 
