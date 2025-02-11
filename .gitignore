@@ -1,2 +1,41 @@
-.idea
-ip-scanner.iml
+# Create or open .gitignore in your text editor and add these contents:
+echo "# IntelliJ IDEA specific files
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.idea_modules/
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+
+# API keys and sensitive data
+config.enc
+.ip_scanner/
+*.env" > .gitignore
