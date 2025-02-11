@@ -5,7 +5,7 @@ This script provides comprehensive threat intelligence gathering capabilities fo
 by integrating with multiple security services including VirusTotal, GrayNoise, Shodan, and
 MITRE ATT&CK framework. It includes secure API key handling and detailed error reporting.
 
-Author: Delaney
+Author: Claude
 Date: February 2025
 """
 
@@ -58,15 +58,15 @@ class APIKeyHandler:
         self.config_path = Path.home() / '.ip_scanner' / 'config.enc'
         self.salt_path = Path.home() / '.ip_scanner' / 'salt'
         self.config_dir = self.config_path.parent
-        
+
     def _get_encryption_key(self, password: str, salt: bytes) -> bytes:
         """
         Derives an encryption key from the master password using PBKDF2.
-        
+
         Args:
             password: Master password for encrypting/decrypting API keys
             salt: Random salt for key derivation
-            
+
         Returns:
             bytes: Derived encryption key
         """
@@ -85,20 +85,20 @@ class APIKeyHandler:
         """
         # Create config directory if it doesn't exist
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Generate random salt for key derivation
         salt = os.urandom(16)
         with open(self.salt_path, 'wb') as f:
             f.write(salt)
-            
+
         # Get API keys and master password from user
         print("Please enter your API keys:")
         vt_key = getpass("VirusTotal API Key: ")
         gn_key = getpass("GrayNoise API Key: ")
         shodan_key = getpass("Shodan API Key: ")
-        
+
         master_password = getpass("Create a master password for encrypting API keys: ")
-        
+
         # Create config parser and add API keys
         config = configparser.ConfigParser()
         config['API_KEYS'] = {
@@ -106,49 +106,49 @@ class APIKeyHandler:
             'graynoise': gn_key,
             'shodan': shodan_key
         }
-        
+
         # Encrypt and save configuration
         key = self._get_encryption_key(master_password, salt)
         f = Fernet(key)
-        
+
         # Convert config to string and encrypt
         config_str = json.dumps(dict(config['API_KEYS']))
         encrypted_data = f.encrypt(config_str.encode())
-        
+
         # Save encrypted configuration
         with open(self.config_path, 'wb') as f:
             f.write(encrypted_data)
-            
+
         logger.info("API keys have been securely stored")
 
     def get_api_keys(self) -> Dict[str, str]:
         """
         Retrieves API keys from the encrypted configuration file.
-        
+
         Returns:
             Dict[str, str]: Dictionary containing API keys for each service
-        
+
         Raises:
             FileNotFoundError: If configuration files don't exist
             ValueError: If decryption fails due to wrong password
         """
         if not self.config_path.exists() or not self.salt_path.exists():
             raise FileNotFoundError("API keys not configured. Please run setup_api_keys() first.")
-            
+
         # Read salt and get master password
         with open(self.salt_path, 'rb') as f:
             salt = f.read()
-            
+
         master_password = getpass("Enter master password to decrypt API keys: ")
-        
+
         # Derive encryption key
         key = self._get_encryption_key(master_password, salt)
         f = Fernet(key)
-        
+
         # Read and decrypt configuration
         with open(self.config_path, 'rb') as f:
             encrypted_data = f.read()
-            
+
         try:
             decrypted_data = f.decrypt(encrypted_data)
             config = json.loads(decrypted_data.decode())
@@ -162,17 +162,17 @@ class APIConfig:
     virustotal_api_key: str
     graynoise_api_key: str
     shodan_api_key: str
-    
+
 class IPScanner:
     """
     Main class for IP scanning and threat intelligence gathering.
     Integrates with multiple security services to provide comprehensive threat analysis.
     """
-    
+
     def __init__(self, config: APIConfig):
         """
         Initialize the IP Scanner with API configurations.
-        
+
         Args:
             config: APIConfig object containing API keys for various services
         """
@@ -181,14 +181,14 @@ class IPScanner:
         # Initialize rate limiting parameters
         self.last_vt_request = 0
         self.vt_rate_limit = 4  # requests per minute
-        
+
     def validate_ip(self, ip_address: str) -> bool:
         """
         Validate whether a string is a properly formatted IPv4 or IPv6 address.
-        
+
         Args:
             ip_address: String containing the IP address to validate
-            
+
         Returns:
             bool: True if valid IP address, False otherwise
         """
@@ -197,7 +197,7 @@ class IPScanner:
             return True
         except ValueError:
             return False
-            
+
     async def _rate_limit_check(self):
         """
         Internal method to handle API rate limiting.
@@ -209,14 +209,14 @@ class IPScanner:
             logger.debug(f"Rate limiting: waiting {wait_time:.2f} seconds")
             time.sleep(wait_time)
         self.last_vt_request = current_time
-            
+
     async def query_virustotal(self, ip_address: str) -> Dict:
         """
         Query VirusTotal API for IP reputation and associated threats.
-        
+
         Args:
             ip_address: IP address to query
-            
+
         Returns:
             Dict containing:
                 - malicious_detections: Number of vendors flagging as malicious
@@ -229,12 +229,12 @@ class IPScanner:
             'apikey': self.config.virustotal_api_key,
             'ip': ip_address
         }
-        
+
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            
+
             return {
                 'malicious_detections': len([v for v in data.get('detected_urls', []) if v['positives'] > 0]),
                 'associated_domains': data.get('resolutions', [])[:5],
@@ -243,15 +243,15 @@ class IPScanner:
         except requests.exceptions.RequestException as e:
             logger.error(f"VirusTotal API error: {e}")
             return {}
-            
+
     async def query_graynoise(self, ip_address: str) -> Dict:
         """
         Query GrayNoise API for IP noise and classification data.
         GrayNoise helps identify Internet background noise and common scanners.
-        
+
         Args:
             ip_address: IP address to query
-            
+
         Returns:
             Dict containing:
                 - classification: IP classification (malicious/benign/unknown)
@@ -261,12 +261,12 @@ class IPScanner:
         """
         url = f"https://api.greynoise.io/v2/noise/context/{ip_address}"
         headers = {'key': self.config.graynoise_api_key}
-        
+
         try:
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             data = response.json()
-            
+
             return {
                 'classification': data.get('classification', 'Unknown'),
                 'tags': data.get('tags', []),
@@ -279,15 +279,15 @@ class IPScanner:
         except requests.exceptions.RequestException as e:
             logger.error(f"GrayNoise API error: {e}")
             return {}
-            
+
     async def query_shodan(self, ip_address: str) -> Dict:
         """
         Query Shodan API for open ports, services, and vulnerabilities.
         Shodan provides internet-wide scanning data and service identification.
-        
+
         Args:
             ip_address: IP address to query
-            
+
         Returns:
             Dict containing:
                 - isp: Internet Service Provider information
@@ -297,7 +297,7 @@ class IPScanner:
         """
         try:
             results = self.shodan_api.host(ip_address)
-            
+
             return {
                 'isp': results.get('isp', 'Unknown'),
                 'open_ports': results.get('ports', []),
@@ -316,18 +316,18 @@ class IPScanner:
         except shodan.APIError as e:
             logger.error(f"Shodan API error: {e}")
             return {}
-            
+
     async def query_mitre_attack(self) -> Dict:
         """
         Query MITRE ATT&CK framework and map techniques to STRIDE categories.
         Provides tactical and technical threat intelligence context.
-        
+
         Returns:
             Dict mapping STRIDE categories to relevant MITRE ATT&CK techniques
         """
         server = Server("https://cti-taxii.mitre.org/taxii/")
         api_root = server.api_roots[0]
-        
+
         # Map MITRE techniques to STRIDE categories
         # This mapping is based on common attack patterns and their primary impact
         stride_mapping = {
@@ -338,7 +338,7 @@ class IPScanner:
             StrideCategory.DENIAL_OF_SERVICE: ['T1498', 'T1499'],  # Network Denial of Service
             StrideCategory.ELEVATION_OF_PRIVILEGE: ['T1068', 'T1548']  # Exploitation for Privilege Escalation
         }
-        
+
         techniques = {}
         for category, technique_ids in stride_mapping.items():
             techniques[category.value] = []
@@ -349,35 +349,54 @@ class IPScanner:
                     'id': technique_id,
                     'name': f"Technique {technique_id}"
                 })
-                
+
         return techniques
-        
+
     def format_output(self, ip_address: str, results: Dict) -> str:
         """
         Format the scanning results into a human-readable string.
-        
+
         Args:
             ip_address: The scanned IP address
             results: Dictionary containing results from all API queries
-            
+
         Returns:
             str: Formatted string containing all scanning results
         """
         output = [f"IP Address: {ip_address}\n"]
-        
+
         # VirusTotal Section
         output.append("### VirusTotal:")
         vt_data = results.get('virustotal', {})
         output.append(f"- Malicious Detections: {vt_data.get('malicious_detections', 0)}")
         output.append("- Associated Domains: " + ", ".join([d.get('hostname', '') for d in vt_data.get('associated_domains', [])]))
         output.append("- Related Files: " + ", ".join([f['sha256'] for f in vt_data.get('related_files', [])[:3]]))
-        
+
         # GrayNoise Section
         output.append("\n### GrayNoise:")
         gn_data = results.get('graynoise', {})
         output.append(f"- Classification: {gn_data.get('classification', 'Unknown')}")
         output.append(f"- Tags: {', '.join(gn_data.get('tags', []))}")
         output.append(f"- Last Seen: {gn_data.get('last_seen', 'Never')}")
-        
+
         # Shodan Section
-        output.append("\n###
+        output.append("\n### Shodan:")
+        shodan_data = results.get('shodan', {})
+        output.append(f"- ISP: {shodan_data.get('isp', 'Unknown')}")
+        output.append(f"- Open Ports: {', '.join(map(str, shodan_data.get('open_ports', [])))}")
+        vulns = shodan_data.get('vulnerabilities', [])
+        if vulns:
+            output.append("- Vulnerabilities:")
+            for vuln in vulns[:3]:
+                output.append(f"  * {vuln['cve']} ({vuln['severity']})")
+
+        # MITRE ATT&CK Section
+        output.append("\n### MITRE ATT&CK (Mapped to STRIDE):")
+        mitre_data = results.get('mitre', {})
+        for category, techniques in mitre_data.items():
+            if techniques:
+                output.append(f"- **{category}**:")
+                for technique in techniques[:2]:
+                    output.append(f"  * {technique['id']} ({technique['name']})")
+
+        return "\n".join(output)
