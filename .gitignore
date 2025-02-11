@@ -1,4 +1,5 @@
 # Create or open .gitignore in your text editor and add these contents:
+test.py
 echo "# IntelliJ IDEA specific files
 .idea/
 *.iml
