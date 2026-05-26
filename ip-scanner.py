@@ -457,6 +457,41 @@ def _fetch_and_cache_mitre(self, cache_path: Path) -> Dict:
 
         return "\n".join(output)
         
+def format_output(self, ip_address: str, results: Dict) -> str:
+        """Format the scanning results into a human-readable string."""
+        output = [f"IP Address: {ip_address}\n"]
+
+        output.append("### VirusTotal:")
+        vt_data = results.get('virustotal', {})
+        output.append(f"- Malicious Detections: {vt_data.get('malicious_detections', 0)}")
+        output.append("- Associated Domains: " + ", ".join([d.get('hostname', '') for d in vt_data.get('associated_domains', [])]))
+        output.append("- Related Files: " + ", ".join([f['sha256'] for f in vt_data.get('related_files', [])[:3]]))
+
+        output.append("\n### GrayNoise:")
+        gn_data = results.get('graynoise', {})
+        output.append(f"- Classification: {gn_data.get('classification', 'Unknown')}")
+        output.append(f"- Tags: {', '.join(gn_data.get('tags', []))}")
+        output.append(f"- Last Seen: {gn_data.get('last_seen', 'Never')}")
+
+        output.append("\n### Shodan:")
+        shodan_data = results.get('shodan', {})
+        output.append(f"- ISP: {shodan_data.get('isp', 'Unknown')}")
+        output.append(f"- Open Ports: {', '.join(map(str, shodan_data.get('open_ports', [])))}")
+        vulns = shodan_data.get('vulnerabilities', [])
+        if vulns:
+            output.append("- Vulnerabilities:")
+            for vuln in vulns[:3]:
+                output.append(f"  * {vuln['cve']} ({vuln['severity']})")
+
+        output.append("\n### MITRE ATT&CK (Mapped to STRIDE):")
+        mitre_data = results.get('mitre', {})
+        for category, techniques in mitre_data.items():
+            if techniques:
+                output.append(f"- **{category}**:")
+                for technique in techniques[:2]:
+                    output.append(f"  * {technique['id']} ({technique['name']})")
+
+        return "\n".join(output)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="IP Threat Intelligence Scanner")
