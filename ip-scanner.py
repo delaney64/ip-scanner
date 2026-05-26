@@ -319,37 +319,94 @@ class IPScanner:
 
     async def query_mitre_attack(self) -> Dict:
         """
-        Query MITRE ATT&CK framework and map techniques to STRIDE categories.
-        Provides tactical and technical threat intelligence context.
-
-        Returns:
-            Dict mapping STRIDE categories to relevant MITRE ATT&CK techniques
+        Fetch MITRE ATT&CK technique data from local cache or GitHub.
+        Cache is stored in ~/.ip_scanner/attack_cache.json and refreshed every 30 days.
         """
-        # TAXII server retired - using static mapping only
+        cache_path = Path.home() / '.ip_scanner' / 'attack_cache.json'
+        cache_max_age_days = 30
 
-        # Map MITRE techniques to STRIDE categories
-        # This mapping is based on common attack patterns and their primary impact
+        if cache_path.exists():
+            cache_age = datetime.now().timestamp() - cache_path.stat().st_mtime
+            if cache_age < (cache_max_age_days * 86400):
+                logger.info("Loading MITRE ATT&CK data from local cache")
+                with open(cache_path, 'r') as f:
+                    attack_data = json.load(f)
+            else:
+                logger.info("Cache expired, refreshing MITRE ATT&CK data")
+                attack_data = self._fetch_and_cache_mitre(cache_path)
+        else:
+            logger.info("No cache found, fetching MITRE ATT&CK data")
+            attack_data = self._fetch_and_cache_mitre(cache_path)
+
+        technique_lookup = {}
+        for obj in attack_data.get('objects', []):
+            if obj.get('type') == 'attack-pattern':
+                for ref in obj.get('external_references', []):
+                    if ref.get('source_name') == 'mitre-attack':
+                        technique_lookup[ref['external_id']] = obj.get('name', 'Unknown')
+
         stride_mapping = {
-            StrideCategory.SPOOFING: ['T1071', 'T1534'],  # Application Layer Protocol, Internal Spearphishing
-            StrideCategory.TAMPERING: ['T1565', 'T1565.001'],  # Data Manipulation
-            StrideCategory.REPUDIATION: ['T1070', 'T1070.001'],  # Indicator Removal
-            StrideCategory.INFORMATION_DISCLOSURE: ['T1020', 'T1030'],  # Automated Exfiltration
-            StrideCategory.DENIAL_OF_SERVICE: ['T1498', 'T1499'],  # Network Denial of Service
-            StrideCategory.ELEVATION_OF_PRIVILEGE: ['T1068', 'T1548']  # Exploitation for Privilege Escalation
+            StrideCategory.SPOOFING: ['T1071', 'T1534'],
+            StrideCategory.TAMPERING: ['T1565', 'T1565.001'],
+            StrideCategory.REPUDIATION: ['T1070', 'T1070.001'],
+            StrideCategory.INFORMATION_DISCLOSURE: ['T1020', 'T1030'],
+            StrideCategory.DENIAL_OF_SERVICE: ['T1498', 'T1499'],
+            StrideCategory.ELEVATION_OF_PRIVILEGE: ['T1068', 'T1548']
         }
 
         techniques = {}
         for category, technique_ids in stride_mapping.items():
             techniques[category.value] = []
-            for technique_id in technique_ids:
-                # In a real implementation, you would query the TAXII server
-                # This is a simplified version
+            for tid in technique_ids:
                 techniques[category.value].append({
-                    'id': technique_id,
-                    'name': f"Technique {technique_id}"
+                    'id': tid,
+                    'name': technique_lookup.get(tid, 'Unknown Technique')
                 })
 
         return techniques
+
+    def _fetch_and_cache_mitre(self, cache_path: Path) -> Dict:
+        """
+        Fetch MITRE ATT&CK STIX data from GitHub and save to local cache.
+        """
+        url = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
+        try:
+            logger.info("Fetching MITRE ATT&CK data from GitHub...")
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_path, 'w') as f:
+                json.dump(data, f)
+
+            logger.info(f"MITRE ATT&CK data cached to {cache_path}")
+            return data
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch MITRE ATT&CK data: {e}")
+            return {'objects': []}
+
+def _fetch_and_cache_mitre(self, cache_path: Path) -> Dict:
+    """
+    Fetch MITRE ATT&CK STIX data from GitHub and save to local cache.
+    """
+    url = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
+    try:
+        logger.info("Fetching MITRE ATT&CK data from GitHub...")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        # Save to cache
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, 'w') as f:
+            json.dump(data, f)
+
+        logger.info(f"MITRE ATT&CK data cached to {cache_path}")
+        return data
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch MITRE ATT&CK data: {e}")
+        return {'objects': []}
 
     def format_output(self, ip_address: str, results: Dict) -> str:
         """
