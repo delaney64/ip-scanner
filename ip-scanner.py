@@ -8,7 +8,7 @@ MITRE ATT&CK framework. It includes secure API key handling and detailed error r
 Author: Delaney
 Date: February 2025
 """
-
+import argparse
 import ipaddress
 import json
 import time
@@ -400,3 +400,29 @@ class IPScanner:
                     output.append(f"  * {technique['id']} ({technique['name']})")
 
         return "\n".join(output)
+        
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="IP Threat Intelligence Scanner")
+    parser.add_argument("ip", nargs="?", help="IP address to scan")
+    parser.add_argument("--setup", action="store_true", help="Run API key setup")
+    args = parser.parse_args()
+
+    handler = APIKeyHandler()
+
+    if args.setup:
+        handler.setup_api_keys()
+    else:
+        keys = handler.get_api_keys()
+        config = APIConfig(
+            virustotal_api_key=keys['virustotal'],
+            graynoise_api_key=keys['graynoise'],
+            shodan_api_key=keys['shodan']
+        )
+        scanner = IPScanner(config)
+
+        if not scanner.validate_ip(args.ip):
+            print(f"[!] Invalid IP address: {args.ip}")
+            exit(1)
+
+        print(f"[*] Scanning {args.ip}...")
