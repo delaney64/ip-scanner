@@ -325,8 +325,7 @@ class IPScanner:
         Returns:
             Dict mapping STRIDE categories to relevant MITRE ATT&CK techniques
         """
-        server = Server("https://cti-taxii.mitre.org/taxii/")
-        api_root = server.api_roots[0]
+        # TAXII server retired - using static mapping only
 
         # Map MITRE techniques to STRIDE categories
         # This mapping is based on common attack patterns and their primary impact
