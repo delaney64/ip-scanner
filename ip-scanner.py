@@ -425,4 +425,16 @@ if __name__ == "__main__":
             print(f"[!] Invalid IP address: {args.ip}")
             exit(1)
 
-        print(f"[*] Scanning {args.ip}...")
+        import asyncio
+
+async def run_scan(scanner, ip):
+    results = {
+        'virustotal': await scanner.query_virustotal(ip),
+        'graynoise': await scanner.query_graynoise(ip),
+        'shodan': await scanner.query_shodan(ip),
+        'mitre': await scanner.query_mitre_attack()
+    }
+    print(scanner.format_output(ip, results))
+
+print(f"[*] Scanning {args.ip}...")
+asyncio.run(run_scan(scanner, args.ip))
