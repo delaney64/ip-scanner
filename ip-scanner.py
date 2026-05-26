@@ -202,26 +202,26 @@ class IPScanner:
             return {}
 
     async def query_graynoise(self, ip_address: str) -> Dict:
-        url = f"https://api.greynoise.io/v2/noise/context/{ip_address}"
-        headers = {'key': self.config.graynoise_api_key}
+        """Query GrayNoise v3 community API for IP classification data."""
+        url = f"https://api.greynoise.io/v3/community/{ip_address}"
+        headers = {'key': self.config.graynoise_api_key, 'Accept': 'application/json'}
         try:
             response = requests.get(url, headers=headers, timeout=15)
             response.raise_for_status()
             data = response.json()
             return {
                 'classification': data.get('classification', 'Unknown'),
-                'tags': data.get('tags', []),
+                'tags': [data.get('name', '')] if data.get('name') else [],
                 'last_seen': data.get('last_seen', 'Never'),
-                'metadata': {
-                    'organization': data.get('metadata', {}).get('organization', 'Unknown'),
-                    'country': data.get('metadata', {}).get('country', 'Unknown'),
-                },
+                'noise': data.get('noise', False),
+                'riot': data.get('riot', False),
             }
         except requests.exceptions.RequestException as e:
             logger.error(f"GrayNoise API error: {e}")
             return {}
-
+        
     async def query_shodan(self, ip_address: str) -> Dict:
+        """Query Shodan for open ports, services, and vulnerabilities."""
         try:
             results = self.shodan_api.host(ip_address)
             return {
