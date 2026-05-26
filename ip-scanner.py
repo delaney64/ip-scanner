@@ -143,14 +143,14 @@ class APIKeyHandler:
 
         # Derive encryption key
         key = self._get_encryption_key(master_password, salt)
-        f = Fernet(key)
+        fernet = Fernet(key)
 
-        # Read and decrypt configuration
-        with open(self.config_path, 'rb') as f:
-            encrypted_data = f.read()
+# Read and decrypt configuration
+        with open(self.config_path, 'rb') as file:
+             encrypted_data = file.read()
 
         try:
-            decrypted_data = f.decrypt(encrypted_data)
+            decrypted_data = fernet.decrypt(encrypted_data)
             config = json.loads(decrypted_data.decode())
             return config
         except Exception as e:
